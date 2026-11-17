@@ -4,6 +4,7 @@
 import { createHash, randomBytes } from "node:crypto"
 import { readFileSync, readdirSync } from "node:fs"
 import os from "node:os"
+import { startDashboard } from "./dashboard.mjs"
 
 const ID = "zgap"
 const ORIGIN = "https://ai-proxy.zz.gg"
@@ -16,7 +17,9 @@ const NPM = "@ai-sdk/openai-compatible"
 // ZGAP serves every model on Chat Completions, Messages and Responses alike. Listing all three has
 // magpie relay each agent's request in its own protocol instead of translating it to Chat.
 const ALSO = ["@ai-sdk/anthropic", "@ai-sdk/openai"]
-const VERSION = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8")).version
+const MANIFEST = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8"))
+const VERSION = MANIFEST.version
+let dashboard
 const SIGN_IN_LABELS = Object.fromEntries(readdirSync(new URL("./locales/", import.meta.url))
   .filter((file) => file.endsWith(".json"))
   .map((file) => [file.slice(0, -5), JSON.parse(readFileSync(new URL(`./locales/${file}`, import.meta.url), "utf8")).signInLabel]))
@@ -226,11 +229,26 @@ async function models(provider, { auth }) {
     api: { id: m.id, url: BASE, npm: NPM },
     also: ALSO,
     status: "active",
-    limit: { context: Number.isFinite(m.context_length) && m.context_length > 0 ? m.context_length : 0, output: 0 },
+    limit: {
+      ...(Number.isInteger(m.context_length) && m.context_length > 0 ? { context: m.context_length } : {}),
+      ...(Number.isInteger(m.max_output_tokens) && m.max_output_tokens > 0 ? { output: m.max_output_tokens } : {}),
+    },
+    capabilities: {
+      ...(typeof m.reasoning === "boolean" ? { reasoning: m.reasoning } : {}),
+      ...(typeof m.tool_call === "boolean" ? { toolcall: m.tool_call } : {}),
+      ...Object.fromEntries(["input", "output"].flatMap((direction) => {
+        const values = m[`${direction}_modalities`]
+        if (!Array.isArray(values) || !values.every((value) => typeof value === "string" && value)) return []
+        // Explicit image=false keeps an administrator's text-only policy visible to magpie.
+        return [[direction, { ...Object.fromEntries(values.map((value) => [value, true])), image: values.includes("image") }]]
+      })),
+    },
+    ...(typeof m.temperature === "boolean" ? { temperature: m.temperature } : {}),
   }]))
 }
 
-export async function ZgapPlugin() {
+export async function ZgapPlugin(input, options = {}) {
+  if (input?.magpie && input.directory) dashboard ??= await startDashboard({ directory: input.directory, port: options.port ?? MANIFEST.magpie.page.service.port })
   return {
     config: async (config) => {
       config.provider ??= {}

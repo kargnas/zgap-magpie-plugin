@@ -21,6 +21,12 @@ No terminal commands or API-key copying are needed. The **ZGAP** sidebar page an
 panel keep the steps in the app. Right-click a provider or agent and choose **ZGAP setup guide** to
 open the relevant step. The plugin follows magpie’s light/dark theme and language.
 
+After sign-in, the same page becomes a compact activity dashboard. It shows the selected ZGAP account’s
+24-hour, 7-day or 30-day request totals, token counts, current-catalog cost estimate, daily trend,
+model breakdown and live requests. The connection guide remains available under **Show connection guide**.
+The dashboard asks ZGAP for only the signed-in account’s data; it does not read prompts, API keys or
+refresh tokens. If the account is signed out, the page returns to the connection guide.
+
 If you already installed the plugin, use **Plugins → Installed → ZGAP → Update** to get the current
 icon and guide.
 

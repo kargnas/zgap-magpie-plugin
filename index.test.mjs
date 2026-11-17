@@ -171,11 +171,33 @@ test("models come from ZGAP's list and are served on all three APIs", async () =
     api: { id: "openai/gpt-test", url: "https://ai-proxy.zz.gg/v1", npm: "@ai-sdk/openai-compatible" },
     also: ["@ai-sdk/anthropic", "@ai-sdk/openai"],
     status: "active",
-    limit: { context: 272000, output: 0 },
+    limit: { context: 272000 },
+    capabilities: {},
   })
   assert.equal(listed["moonshot/kimi-test"].name, "moonshot/kimi-test")
-  assert.equal(listed["moonshot/kimi-test"].limit.context, 0)
+  assert.equal(listed["moonshot/kimi-test"].limit.context, undefined)
 
   stub(() => json(503, {}))
   await assert.rejects(() => provider.models({ id: "zgap", models: {} }, { auth: { type: "oauth", access: "token" } }), /HTTP 503/)
+})
+
+test("catalog metadata keeps routing IDs, explicit false values and unknown limits", async () => {
+  const { provider } = await ZgapPlugin()
+  stub(() => json(200, { data: [
+    { id: "invented.publisher/model-9-3", display_name: "Model Nine 9.3", context_length: 400000, max_output_tokens: 32000,
+      input_modalities: ["text"], output_modalities: ["text", "audio"], reasoning: false, tool_call: true, temperature: false },
+    { id: "new.publisher/vision", max_output_tokens: -1, input_modalities: ["text", "image"], reasoning: true },
+    { id: "unknown/item", context_length: "1000", max_output_tokens: null, input_modalities: [null] },
+  ] }))
+  const rows = await provider.models({ models: {} }, { auth: { type: "oauth", access: "token" } })
+  const first = rows["invented.publisher/model-9-3"]
+  assert.equal(first.name, "Model Nine 9.3")
+  assert.equal(first.api.id, "invented.publisher/model-9-3")
+  assert.deepEqual(first.limit, { context: 400000, output: 32000 })
+  assert.deepEqual(first.capabilities, { reasoning: false, toolcall: true, input: { text: true, image: false }, output: { text: true, audio: true, image: false } })
+  assert.equal(first.temperature, false)
+  assert.equal(rows["new.publisher/vision"].capabilities.input.image, true)
+  assert.equal(rows["new.publisher/vision"].capabilities.reasoning, true)
+  assert.deepEqual(rows["unknown/item"].limit, {})
+  assert.deepEqual(rows["unknown/item"].capabilities, {})
 })

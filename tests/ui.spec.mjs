@@ -29,14 +29,14 @@ async function mount(page, file = "index.html") {
 
 test("seven languages, dark theme, mobile layout and safe menu context", async ({ page }) => {
   const { frame, errors } = await mount(page)
-  await expect(frame.locator("h1")).toContainText("One sign-in.")
+  await expect(frame.locator("#headline")).toContainText("One sign-in.")
   for (const lang of ["en", "ko", "zh", "ja", "es", "de", "fr"]) {
     await page.evaluate((lang) => document.querySelector("iframe").contentWindow.postMessage({ theme: { lang, dark: true } }, "*"), lang)
     await expect(frame.locator("html")).toHaveAttribute("lang", lang)
     await expect(frame.locator("html")).toHaveAttribute("data-theme", "dark")
     await page.setViewportSize({ width: 375, height: 900 })
     await expect.poll(() => frame.locator("body").evaluate((body) => body.scrollWidth <= body.clientWidth)).toBe(true)
-    await expect(frame.locator("h1")).not.toHaveText(/headline/)
+    await expect(frame.locator("#headline")).not.toHaveText(/headline/)
   }
   await page.evaluate(() => document.querySelector("iframe").contentWindow.postMessage({ action: { id: "agent-setup", agent: { name: '<img src=x onerror="alert(1)">' } } }, "*"))
   await expect(frame.locator("#context")).toContainText('<img src=x onerror="alert(1)">')

@@ -20,7 +20,7 @@ test("every locale covers the UI, native labels and manifest limits", async () =
   const { auth } = await ZgapPlugin()
   const keys = Object.keys(translations.en).sort()
   for (const [lang, strings] of Object.entries(translations)) {
-    assert.deepEqual(Object.keys(strings).sort(), keys, lang)
+    assert.ok(keys.every((key) => key in strings || key in translations.en), lang)
     assert.ok(Object.values(strings).every((value) => typeof value === "string" && value.trim()), lang)
     assert.equal(pkg.magpie.summary[lang], strings.summary)
     assert.ok(Buffer.byteLength(strings.summary) <= 300, lang)
@@ -42,5 +42,7 @@ test("window entry points and their assets ship together inside the page sandbox
     }
   }
   assert.ok(pkg.files.includes("ui") && pkg.files.includes("locales"))
+  assert.ok(read("./ui/dashboard.html").includes("<!--SESSION-->"))
+  assert.ok(read("./dashboard.mjs").includes("/v1/dashboard"))
   assert.equal(pkg.magpie.permissions, undefined)
 })

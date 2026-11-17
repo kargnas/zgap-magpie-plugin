@@ -8,6 +8,7 @@
     "index.mjs",
     "locales",
     "ui",
+    "dashboard.mjs",
     "README.md",
     "LICENSE"
   ],
@@ -23,7 +24,7 @@
   },
   "homepage": "https://github.com/kargnas/zgap-magpie-plugin#readme",
   "scripts": {
-    "test": "node --test index.test.mjs ui.test.mjs",
+    "test": "node --test index.test.mjs ui.test.mjs dashboard.test.mjs",
     "build:ui": "node scripts/build-ui.mjs",
     "test:ui": "playwright test"
   },
@@ -42,7 +43,11 @@
     "page": {
       "title": "ZGAP",
       "file": "ui/index.html",
-      "icon": "ui/icon.svg"
+      "icon": "ui/icon.svg",
+      "service": {
+        "port": 3491,
+        "option": "port"
+      }
     },
     "panels": [
       {
@@ -89,7 +94,10 @@
           "zh": "ZGAP 连接指南"
         }
       }
-    ]
+    ],
+    "options": {
+      "port": 3491
+    }
   },
   "devDependencies": {
     "@playwright/test": "1.65.1",
