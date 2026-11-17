@@ -201,3 +201,17 @@ test("catalog metadata keeps routing IDs, explicit false values and unknown limi
   assert.deepEqual(rows["unknown/item"].limit, {})
   assert.deepEqual(rows["unknown/item"].capabilities, {})
 })
+
+test("speed tiers in ZGAP's list reach magpie as serviceTiers, and a model without them gets none", async () => {
+  const { provider } = await ZgapPlugin()
+  const tiers = [{ id: "priority", name: "Fast" }, { id: "ultrafast", name: "Ultrafast" }]
+  stub(() => json(200, { data: [
+    { id: "openai/gpt-imaginary-9", service_tiers: tiers },
+    { id: "openai/gpt-no-tiers" },
+    { id: "odd/model", service_tiers: "priority" },
+  ] }))
+  const rows = await provider.models({ models: {} }, { auth: { type: "oauth", access: "token" } })
+  assert.deepEqual(rows["openai/gpt-imaginary-9"].serviceTiers, tiers)
+  assert.equal("serviceTiers" in rows["openai/gpt-no-tiers"], false)
+  assert.equal("serviceTiers" in rows["odd/model"], false)
+})

@@ -244,6 +244,9 @@ async function models(provider, { auth }) {
       })),
     },
     ...(typeof m.temperature === "boolean" ? { temperature: m.temperature } : {}),
+    // magpie offers Fast and Ultrafast only on a model whose serviceTiers name them. ZGAP lists the
+    // tiers its accounts serve the model at, as Codex gets them; magpie reads each object's id.
+    ...(Array.isArray(m.service_tiers) ? { serviceTiers: m.service_tiers } : {}),
   }]))
 }
 
