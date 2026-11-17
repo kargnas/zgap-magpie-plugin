@@ -40,11 +40,30 @@ test("the console guide, live events and filtered account statistics work in Mag
     return Response.json({ groupBy: [axis], bucket, rows: [row], costRows: null, costSampled: false, filters: [],
       from: url.searchParams.get("from"), to: url.searchParams.get("to"), timeZone: "UTC", prices: {}, thresholds: [] })
   } })
-  const parent = http.createServer((_req, res) => {
+  const local = `http://127.0.0.1:${service.address().port}`
+  const prefix = "/_magpie/plugin/test-page/_magpie/service/"
+  // The desktop window can use loopback; Magpie Web mounts the same service under a tokenized path.
+  const framed = info.project.name === "webkit" ? prefix : local + "/"
+  const parent = http.createServer((req, res) => {
+    if (req.url.startsWith(prefix)) {
+      const headers = { ...req.headers, host: new URL(local).host }
+      delete headers.cookie
+      const proxy = http.request(new URL(req.url.slice(prefix.length), local), { method: req.method, headers }, up => {
+        const out = { ...up.headers }
+        if (out["content-security-policy"]) out["content-security-policy"] = out["content-security-policy"].replaceAll("'self'", `'self' http://${req.headers.host}${prefix}`)
+        res.writeHead(up.statusCode, out)
+        up.pipe(res)
+      })
+      proxy.on("error", () => res.destroy())
+      res.on("close", () => proxy.destroy())
+      req.pipe(proxy)
+      return
+    }
+    if (req.url !== "/") { res.writeHead(404).end(); return }
     res.setHeader("content-type", "text/html")
     res.end(`<!doctype html><style>body{margin:0}iframe{width:100%;height:100vh;border:0}</style><script>
       addEventListener('message',e=>{if(e.data.method==='hello')e.source.postMessage({magpie:1,id:e.data.id,result:{dark:false,lang:'en',visible:true}},'*')})</script>
-      <iframe title="ZGAP" sandbox="allow-scripts" src="http://127.0.0.1:${service.address().port}/"></iframe>`)
+      <iframe title="ZGAP" sandbox="allow-scripts" src="${framed}"></iframe>`)
   })
   await new Promise(resolve => parent.listen(0, "127.0.0.1", resolve))
   const message = (event, data) => page.evaluate(([event, data]) => document.querySelector('iframe').contentWindow.postMessage({ magpie: 1, event, data }, '*'), [event, data])

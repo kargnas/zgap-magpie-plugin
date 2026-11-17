@@ -13,8 +13,8 @@
     })
   }
   try {
-    await load(Object.assign(document.createElement("link"), { rel: "stylesheet", href: "/console.css" }))
-    await load(Object.assign(document.createElement("script"), { src: "/console.js" }))
+    await load(Object.assign(document.createElement("link"), { rel: "stylesheet", href: "console.css" }))
+    await load(Object.assign(document.createElement("script"), { src: "console.js" }))
   } catch {
     status.setAttribute("role", "alert")
     const retry = document.createElement("button")
