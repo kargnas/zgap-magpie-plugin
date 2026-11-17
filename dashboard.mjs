@@ -2,13 +2,18 @@ import http from "node:http"
 import { readFile } from "node:fs/promises"
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto"
 import path from "node:path"
+import { Readable } from "node:stream"
+import { pipeline } from "node:stream/promises"
 
 const ORIGIN = "https://ai-proxy.zz.gg"
 const ASSETS = new Map([
-  ["/app.js", "text/javascript"], ["/dashboard-bridge.js", "text/javascript"],
-  ["/messages.js", "text/javascript"], ["/style.css", "text/css"],
-  ["/icon.svg", "image/svg+xml"], ["/vendor/i18next.min.js", "text/javascript"],
+  ["/dashboard-boot.js", "text/javascript"], ["/dashboard-bridge.js", "text/javascript"],
+  ["/messages.js", "text/javascript"],
+  ["/icon.svg", "image/svg+xml"],
 ])
+
+const CONSOLE_ASSETS = new Map([["/console.js", "text/javascript"], ["/console.css", "text/css"]])
+const READS = new Set(["/api/usage-stats", "/api/account-equivalents", "/api/events"])
 
 // The host supplies its actual config directory, including portable and isolated installations.
 // Read only ZGAP entries; magpie alone writes, renews and removes these credentials.
@@ -56,29 +61,51 @@ export async function startDashboard({ directory, port, fetchImpl = fetch }) {
         if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) return send(403, { error: "forbidden" })
         if (request.method !== "GET") return send(405, { error: "method_not_allowed" })
         const accounts = await readAccounts(directory)
-        const publicAccounts = accounts.map(({ id, label }) => ({ id, label }))
+        const publicAccounts = accounts.map(({ id, label, auth }) => ({ id, label, revision: createHash("sha256").update(token).update(auth.access).digest("hex").slice(0, 16) }))
         if (url.pathname === "/api/session") return send(200, { accounts: publicAccounts })
-        if (!["/api/usage", "/api/live"].includes(url.pathname)) return send(404, { error: "not_found" })
-        const selected = url.searchParams.get("account")
-        const account = selected ? accounts.find(row => row.id === selected) : accounts[0]
+        if (!READS.has(url.pathname)) return send(404, { error: "not_found" })
+        const account = accounts.find(row => row.id === url.searchParams.get("account"))
         if (!account) return send(401, { error: "not_signed_in" })
-        const upstream = new URL(url.pathname === "/api/live" ? "/v1/dashboard/live" : "/v1/dashboard", ORIGIN)
-        if (url.pathname === "/api/usage") {
-          upstream.search = new URLSearchParams({ days: url.searchParams.get("days") ?? "7", timeZone: url.searchParams.get("timeZone") ?? "UTC" })
-        }
+        const upstream = new URL(url.pathname.replace("/api/", "/v1/dashboard/"), ORIGIN)
+        upstream.search = url.search
+        upstream.searchParams.delete("account")
+        const stream = url.pathname === "/api/events"
         const controller = new AbortController()
         response.on("close", () => controller.abort())
-        const result = await fetchImpl(upstream, {
-          headers: { accept: "application/json", authorization: `Bearer ${account.auth.access}` },
-          redirect: "error", signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]),
-        })
-        const body = await result.json()
-        // Sign-out or account replacement during a request must discard the old response.
-        const current = (await readAccounts(directory)).find(row => row.id === account.id)
-        if (!current || current.auth.access !== account.auth.access) return send(401, { error: "session_changed" })
-        return send(result.status, body)
+        const timer = setTimeout(() => controller.abort(), 15000)
+        let revocation
+        const stillSignedIn = async () => (await readAccounts(directory)).some(row => row.id === account.id && row.auth.access === account.auth.access)
+        try {
+          const result = await fetchImpl(upstream, {
+            headers: { accept: stream ? "text/event-stream" : "application/json", authorization: `Bearer ${account.auth.access}` },
+            redirect: "error", signal: controller.signal,
+          })
+          if (stream && result.ok) {
+            if (!result.body || result.headers.get("content-type")?.split(";")[0] !== "text/event-stream") throw new Error("Invalid live response")
+            if (!await stillSignedIn()) return send(401, { error: "session_changed" })
+            clearTimeout(timer)
+            // An open SSE stream outlives the request that selected the account; stop on sign-out or token rotation.
+            revocation = setInterval(() => { void stillSignedIn().then(valid => { if (!valid) controller.abort() }, () => controller.abort()) }, 5000)
+            response.writeHead(200, { ...headers, "content-type": "text/event-stream" })
+            response.flushHeaders()
+            await pipeline(Readable.fromWeb(result.body), response, { signal: controller.signal })
+            return
+          }
+          const body = await result.json()
+          if (!await stillSignedIn()) return send(401, { error: "session_changed" })
+          return send(result.status, body)
+        } finally { clearTimeout(timer); clearInterval(revocation); controller.abort() }
       }
       if (request.method !== "GET") return send(405, { error: "method_not_allowed" })
+      if (CONSOLE_ASSETS.has(url.pathname)) {
+        // Only these public build outputs can run in the frame; the asset request carries no account credentials.
+        const asset = await fetchImpl(new URL("/v1/dashboard/ui" + url.pathname, ORIGIN), { redirect: "error", signal: AbortSignal.timeout(15000) })
+        const type = CONSOLE_ASSETS.get(url.pathname)
+        if (!asset.ok || !asset.body || !(type === "text/javascript" ? /^(application|text)\/javascript$/ : /^text\/css$/).test(asset.headers.get("content-type")?.split(";")[0] ?? "")) return send(502, { error: "console_unavailable" })
+        response.writeHead(200, { ...headers, "content-type": type })
+        await pipeline(Readable.fromWeb(asset.body), response)
+        return
+      }
       const file = url.pathname === "/" ? "dashboard.html" : ASSETS.has(url.pathname) ? url.pathname.slice(1) : null
       if (!file) return send(404, { error: "not_found" })
       const content = await readFile(new URL(`./ui/${file}`, import.meta.url))
@@ -90,7 +117,8 @@ export async function startDashboard({ directory, port, fetchImpl = fetch }) {
       response.end(url.pathname === "/" ? content.toString("utf8").replace("<!--SESSION-->", `<meta name="zgap-page-token" content="${token}">`) : content)
     } catch (error) {
       // Upstream bodies and credentials never go into local errors or logs.
-      if (!response.destroyed) send(502, { error: "dashboard_unavailable" })
+      if (response.destroyed || response.headersSent) return response.destroy()
+      send(502, { error: "dashboard_unavailable" })
       console.error("ZGAP dashboard request failed:", error.name)
     }
   })

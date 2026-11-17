@@ -3,16 +3,20 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
   <!--SESSION-->
   <title>ZGAP</title>
-  <link rel="stylesheet" href="style.css">
+  <style>
+    body{margin:0;font:13px system-ui}#initializing{display:flex;align-items:center;gap:.6rem;padding:1.25rem}
+    #initializing[role=status]::before{content:"";width:.8rem;height:.8rem;border:2px solid GrayText;border-right-color:transparent;border-radius:50%;animation:spin .8s linear infinite}
+    @keyframes spin{to{transform:rotate(1turn)}}
+    @media(prefers-reduced-motion:reduce){#initializing::before{animation:none}}
+  </style>
   <script src="dashboard-bridge.js"></script>
-  <script src="vendor/i18next.min.js" defer></script>
   <script src="messages.js" defer></script>
-  <script src="app.js" defer></script>
+  <script src="dashboard-boot.js" defer></script>
 </head>
-<body>
-  <div id="initializing" role="status"><span class="spinner" aria-hidden="true"></span>Preparing ZGAP…</div>
-  <main id="app" hidden></main>
+<body class="min-h-screen bg-background text-ink antialiased font-sans">
+  <div id="app"><div id="initializing" role="status">Preparing ZGAP…</div></div>
 </body>
 </html>

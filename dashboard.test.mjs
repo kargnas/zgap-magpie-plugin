@@ -42,16 +42,19 @@ test("dashboard proxies usage with the selected OAuth account and opaque page to
     assert.ok(token)
     const session = await fetch(`http://127.0.0.1:${port}/api/session`, { headers: { origin: "null", "x-zgap-page-token": token } })
     assert.equal(session.status, 200)
-    const account = (await session.json()).accounts[0].id
+    const data = await session.json()
+    assert.doesNotMatch(JSON.stringify(data), /access-one/)
+    const account = data.accounts[0].id
+    assert.equal((await fetch(`http://127.0.0.1:${port}/api/admin/logs?account=${account}`, { headers: { "x-zgap-page-token": token } })).status, 404)
     assert.equal((await fetch(`http://127.0.0.1:${port}/api/session`)).status, 403)
     assert.equal((await fetch(`http://127.0.0.1:${port}/api/session`, { headers: { origin: "https://evil.example", "x-zgap-page-token": token } })).status, 403)
     const hostileHost = await new Promise((resolve, reject) => http.get(`http://127.0.0.1:${port}/api/session`, { headers: { host: "evil.example", "x-zgap-page-token": token } }, response => { response.resume(); resolve(response.statusCode) }).on("error", reject))
     assert.equal(hostileHost, 403)
-    assert.equal((await fetch(`http://127.0.0.1:${port}/api/usage?account=other`, { headers: { "x-zgap-page-token": token } })).status, 401)
-    const usage = await fetch(`http://127.0.0.1:${port}/api/usage?account=${account}&days=7`, { headers: { origin: "null", "x-zgap-page-token": token } })
+    assert.equal((await fetch(`http://127.0.0.1:${port}/api/usage-stats?account=other`, { headers: { "x-zgap-page-token": token } })).status, 401)
+    const usage = await fetch(`http://127.0.0.1:${port}/api/usage-stats?account=${account}&groupBy=model&filter=source%3Aa&filter=source%3Ab`, { headers: { origin: "null", "x-zgap-page-token": token } })
     assert.equal(usage.status, 200)
     assert.equal(calls[0].headers.authorization, "Bearer access-one")
-    assert.equal(calls[0].url, "https://ai-proxy.zz.gg/v1/dashboard?days=7&timeZone=UTC")
+    assert.equal(calls[0].url, "https://ai-proxy.zz.gg/v1/dashboard/usage-stats?groupBy=model&filter=source%3Aa&filter=source%3Ab")
     assert.equal(JSON.stringify(await usage.json()).includes("access-one"), false)
   } finally { server.close() }
 })
@@ -67,7 +70,30 @@ test("sign-out during an upstream request discards its response", async (t) => {
   t.after(() => server.close())
   const base = `http://127.0.0.1:${server.address().port}`
   const token = /zgap-page-token" content="([^"]+)"/.exec(await (await fetch(base)).text())[1]
-  const result = await fetch(`${base}/api/live`, { headers: { "x-zgap-page-token": token } })
+  const [account] = (await (await fetch(`${base}/api/session`, { headers: { "x-zgap-page-token": token } })).json()).accounts
+  const result = await fetch(`${base}/api/account-equivalents?account=${account.id}`, { headers: { "x-zgap-page-token": token } })
   assert.equal(result.status, 401)
   assert.deepEqual(await result.json(), { error: "session_changed" })
+})
+
+test("a live stream closes after local sign-out even if the upstream is idle", async (t) => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "zgap-live-"))
+  t.after(() => rm(dir, { recursive: true, force: true }))
+  const credentials = path.join(dir, "plugin-auth.json")
+  await writeFile(credentials, JSON.stringify({ zgap: { type: "oauth", access: "test-access" } }))
+  const server = await startDashboard({ directory: dir, port: 0, fetchImpl: async () =>
+    new Response(new ReadableStream({ start(c) { c.enqueue(new TextEncoder().encode("event: snapshot\ndata: {}\n\n")) } }), { headers: { "content-type": "text/event-stream" } }) })
+  t.after(() => { server.closeAllConnections(); server.close() })
+  const base = `http://127.0.0.1:${server.address().port}`
+  const token = /zgap-page-token" content="([^"]+)"/.exec(await (await fetch(base)).text())[1]
+  const headers = { "x-zgap-page-token": token }
+  const [account] = (await (await fetch(base + "/api/session", { headers })).json()).accounts
+  t.mock.timers.enable({ apis: ["setInterval"] })
+  const result = await fetch(`${base}/api/events?account=${account.id}`, { headers })
+  assert.equal(result.status, 200)
+  const reader = result.body.getReader()
+  assert.match(new TextDecoder().decode((await reader.read()).value), /event: snapshot/)
+  await writeFile(credentials, "{}")
+  t.mock.timers.tick(5000)
+  await assert.rejects(reader.read(), /terminated|abort/i)
 })
