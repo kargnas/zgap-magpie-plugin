@@ -1,24 +1,35 @@
+![ZGAP for magpie: one sign-in, your agents connected](ui/banner.svg)
+
 # ZGAP for magpie
 
 A [magpie](https://usemagpie.ai) plugin that signs in to ZGAP (`https://ai-proxy.zz.gg`) and lets every
 agent magpie serves (Claude Code, Codex, OpenCode and the rest) use ZGAP's models.
 
-## Install
+## Connect in the app
+
+1. Open **Plugins → Discover** in [magpie](https://usemagpie.ai). Search for **ZGAP** and click **Install**.
+   If the listing has not appeared yet, enter `github:kargnas/zgap-magpie-plugin` in the
+   **Have one in mind?** field at the bottom and click **Install**.
+2. Open **Plugins → Installed → ZGAP → Sign in**. You can also use
+   **Providers → Add provider → From plugins → ZGAP**.
+3. In the browser, sign in with your ZGAP Google account and approve **Authorize magpie**.
+   Return to magpie after approval. Only accounts approved by the ZGAP administrator can connect.
+4. Open **Agents**, choose your agent, and select a model under **ZGAP**. Follow magpie’s connection
+   prompt and restart the agent if requested.
+
+No terminal commands or API-key copying are needed. The **ZGAP** sidebar page and **Settings → Plugins**
+panel keep the steps in the app. Right-click a provider or agent and choose **ZGAP setup guide** to
+open the relevant step. The plugin follows magpie’s light/dark theme and language.
+
+If you already installed the plugin, use **Plugins → Installed → ZGAP → Update** to get the current
+icon and guide.
+
+## Connect from a terminal
 
 ```sh
 magpie plugin add github:kargnas/zgap-magpie-plugin
-```
-
-It is also listed in the magpie app under Plugins → Discover → Unofficial.
-
-## Sign in
-
-```sh
 magpie plugin login zgap
 ```
-
-Or add a ZGAP account in the app. A ZGAP page opens in your browser; approve the sign-in with the Google
-account you use for ZGAP. Only accounts the ZGAP administrator has approved can sign in.
 
 The sign-in shows on the ZGAP console under Connect → OAuth as a `magpie` device. Log it out there to
 revoke it. It is a session of its own: signing in here never logs out the [zgap CLI](https://github.com/kargnas/zgap)
@@ -47,15 +58,21 @@ Claude Code's `X-App`.
 ## Development
 
 ```sh
-node --test
+npm ci
+npm run build:ui
+npm test
+npm run test:ui
 ```
 
-To try a change without touching your own magpie, run it with a sandbox home:
-
-```sh
-env -i PATH="$PATH" HOME="$PWD/.sandbox" XDG_CONFIG_HOME="$PWD/.sandbox/.config" XDG_CACHE_HOME="$PWD/.sandbox/.cache" \
-  /Applications/magpie.app/Contents/MacOS/magpie plugin add "$PWD"
-```
+The page and panel are static files served in magpie’s sandbox, with no extra read permissions or
+network access. Authentication stays in magpie’s native sign-in dialog. Translations live in
+`locales/` and use i18next; magpie also reads the translated card summaries and sign-in labels.
+`ui/icon.svg` is the icon source. `npm run build:ui` embeds it in the manifest, generates the native
+labels and browser translation bundle, and copies i18next with its license into `ui/vendor/`.
+Commit those generated assets so installation directly from GitHub works without a build.
+`npm test` rejects stale generated files or incomplete translations. `npm run test:ui` checks the
+page and panel with Chromium and WebKit; install those test browsers with
+`npx playwright install chromium webkit` if needed.
 
 ## License
 

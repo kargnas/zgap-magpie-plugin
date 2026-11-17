@@ -1,2 +1,5 @@
 node_modules/
 .sandbox/
+.agents/ai-tasks/
+test-results/
+playwright-report/

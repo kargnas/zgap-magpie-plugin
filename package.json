@@ -1,20 +1,99 @@
 {
   "name": "zgap-magpie-plugin",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Sign in to ZGAP (ai-proxy.zz.gg) and use its models in magpie",
   "type": "module",
   "main": "./index.mjs",
-  "files": ["index.mjs", "README.md", "LICENSE"],
-  "keywords": ["magpie", "magpie-plugin", "zgap"],
+  "files": [
+    "index.mjs",
+    "locales",
+    "ui",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "magpie",
+    "magpie-plugin",
+    "zgap"
+  ],
   "license": "GPL-3.0-only",
-  "repository": { "type": "git", "url": "git+https://github.com/kargnas/zgap-magpie-plugin.git" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kargnas/zgap-magpie-plugin.git"
+  },
   "homepage": "https://github.com/kargnas/zgap-magpie-plugin#readme",
-  "scripts": { "test": "node --test" },
+  "scripts": {
+    "test": "node --test index.test.mjs ui.test.mjs",
+    "build:ui": "node scripts/build-ui.mjs",
+    "test:ui": "playwright test"
+  },
   "magpie": {
     "name": "ZGAP",
     "summary": {
-      "en": "Sign in to ZGAP (ai-proxy.zz.gg) with your Google account and use its models from any agent magpie serves.",
-      "zh": "用 Google 账号登录 ZGAP（ai-proxy.zz.gg），让 magpie 服务的所有代理使用其中的模型。"
-    }
-  }
+      "de": "Verbinde deine Agenten mit ZGAP. Mit Google anmelden, ein Modell wählen und alles in magpie verwalten.",
+      "en": "Connect your agents to ZGAP. Sign in with Google, choose a model, and manage everything in magpie.",
+      "es": "Conecta tus agentes a ZGAP. Inicia sesión con Google, elige un modelo y gestiona todo desde magpie.",
+      "fr": "Connectez vos agents à ZGAP. Connectez-vous avec Google, choisissez un modèle et gérez tout dans magpie.",
+      "ja": "Google アカウントで ZGAP にログイン。magpie でモデルを選び、エージェントに接続できます。",
+      "ko": "Google 계정으로 ZGAP에 로그인하고, magpie에서 모델을 골라 에이전트에 연결하세요.",
+      "zh": "通过 Google 账号登录 ZGAP，在 magpie 中选择模型并连接你的 AI 代理。"
+    },
+    "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMjgiIGhlaWdodD0iMTI4IiB2aWV3Qm94PSIwIDAgMTI4IDEyOCI+CiAgPHJlY3Qgd2lkdGg9IjEyOCIgaGVpZ2h0PSIxMjgiIHJ4PSIzMiIgZmlsbD0iIzE4Mjc0NiIvPgogIDxwYXRoIGQ9Ik0zMiAzNmg2NHYxNkw1NSA3OGg0MXYxNkgzMlY3OGw0MS0yNkgzMnoiIGZpbGw9IiNjMmY5NzAiLz4KICA8Y2lyY2xlIGN4PSIxMDMiIGN5PSIyNSIgcj0iNyIgZmlsbD0iIzgxYWFmZiIvPgo8L3N2Zz4K",
+    "page": {
+      "title": "ZGAP",
+      "file": "ui/index.html",
+      "icon": "ui/icon.svg"
+    },
+    "panels": [
+      {
+        "slot": "settings",
+        "file": "ui/panel.html",
+        "title": "ZGAP setup",
+        "titles": {
+          "de": "ZGAP verbinden",
+          "en": "ZGAP setup",
+          "es": "Conectar ZGAP",
+          "fr": "Connexion à ZGAP",
+          "ja": "ZGAP の接続",
+          "ko": "ZGAP 연결",
+          "zh": "连接 ZGAP"
+        }
+      }
+    ],
+    "actions": [
+      {
+        "id": "provider-setup",
+        "menu": "provider",
+        "title": "ZGAP setup guide",
+        "titles": {
+          "de": "ZGAP-Verbindungsanleitung",
+          "en": "ZGAP setup guide",
+          "es": "Guía de conexión de ZGAP",
+          "fr": "Guide de connexion à ZGAP",
+          "ja": "ZGAP 接続ガイド",
+          "ko": "ZGAP 연결 안내",
+          "zh": "ZGAP 连接指南"
+        }
+      },
+      {
+        "id": "agent-setup",
+        "menu": "agent",
+        "title": "ZGAP setup guide",
+        "titles": {
+          "de": "ZGAP-Verbindungsanleitung",
+          "en": "ZGAP setup guide",
+          "es": "Guía de conexión de ZGAP",
+          "fr": "Guide de connexion à ZGAP",
+          "ja": "ZGAP 接続ガイド",
+          "ko": "ZGAP 연결 안내",
+          "zh": "ZGAP 连接指南"
+        }
+      }
+    ]
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.1",
+    "i18next": "27.1.5"
+  },
+  "bugs": "https://github.com/kargnas/zgap-magpie-plugin/issues"
 }

@@ -2,7 +2,7 @@
 // leaves renewing the rotating tokens to magpie (auth.refresh), and sends every request with the
 // current access token and the request context ZGAP's usage stats read.
 import { createHash, randomBytes } from "node:crypto"
-import { readFileSync } from "node:fs"
+import { readFileSync, readdirSync } from "node:fs"
 import os from "node:os"
 
 const ID = "zgap"
@@ -17,6 +17,9 @@ const NPM = "@ai-sdk/openai-compatible"
 // magpie relay each agent's request in its own protocol instead of translating it to Chat.
 const ALSO = ["@ai-sdk/anthropic", "@ai-sdk/openai"]
 const VERSION = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8")).version
+const SIGN_IN_LABELS = Object.fromEntries(readdirSync(new URL("./locales/", import.meta.url))
+  .filter((file) => file.endsWith(".json"))
+  .map((file) => [file.slice(0, -5), JSON.parse(readFileSync(new URL(`./locales/${file}`, import.meta.url), "utf8")).signInLabel]))
 const OS_NAMES = { aix: "AIX", android: "Android", darwin: "macOS", freebsd: "FreeBSD", linux: "Linux", openbsd: "OpenBSD", sunos: "SunOS", win32: "Windows" }
 
 // magpie marks an account as needing a new sign-in only for an error whose signIn is "expired".
@@ -241,7 +244,7 @@ export async function ZgapPlugin() {
       provider: ID,
       // ZGAP rotates the refresh token on every renewal and refuses the old one.
       rotating: true,
-      methods: [{ type: "oauth", label: "ZGAP (browser sign-in)", authorize }],
+      methods: [{ type: "oauth", label: SIGN_IN_LABELS.en, labels: SIGN_IN_LABELS, authorize }],
       refresh,
       loader: async (getAuth) => ({ baseURL: BASE, fetch: (input, init) => send(getAuth, input, init) }),
     },
