@@ -42,8 +42,8 @@ test("seven languages, dark theme, mobile layout and safe menu context", async (
   await expect(frame.locator("#context")).toContainText('<img src=x onerror="alert(1)">')
   await expect(frame.locator("#context img")).toHaveCount(0)
   await expect(frame.locator("#agent")).toBeFocused()
-  await frame.locator("summary").click()
-  await expect(frame.locator("details")).toHaveAttribute("open", "")
+  await frame.locator(".privacy summary").click()
+  await expect(frame.locator(".privacy")).toHaveAttribute("open", "")
   expect(errors).toEqual([])
 })
 

@@ -20,7 +20,7 @@ async function start() {
         <dl class="metrics"><div><dt data-i18n="requests"></dt><dd id="requests"></dd></div><div><dt data-i18n="cost"></dt><dd id="cost"></dd></div><div><dt data-i18n="inputTokens"></dt><dd id="input-tokens"></dd></div><div><dt data-i18n="outputTokens"></dt><dd id="output-tokens"></dd></div></dl>
         <p id="cost-note" class="caption" data-i18n="costNote"></p>
         <section class="activity-block"><h2 data-i18n="dailyRequests"></h2><ol id="trend" class="trend"></ol></section>
-        <section class="activity-block"><h2 data-i18n="modelsTitle"></h2><div class="table-scroll"><table><thead><tr><th data-i18n="model"></th><th data-i18n="requests"></th><th data-i18n="outputTokens"></th><th data-i18n="cost"></th></tr></thead><tbody id="model-rows"></tbody></table></div></section>
+        <details id="model-details" class="activity-block"><summary data-i18n="modelsTitle"></summary><div class="table-scroll"><table><thead><tr><th data-i18n="model"></th><th data-i18n="requests"></th><th data-i18n="outputTokens"></th><th data-i18n="cost"></th></tr></thead><tbody id="model-rows"></tbody></table></div></details>
       </div>
       <section class="activity-block"><div class="section-heading"><h2 data-i18n="liveTitle"></h2><span id="live-count" class="pill"></span></div><p class="caption" data-i18n="liveNote"></p><p id="live-error" class="error-message" role="alert" hidden></p><div class="table-scroll"><table><thead><tr><th data-i18n="model"></th><th data-i18n="state"></th><th data-i18n="duration"></th></tr></thead><tbody id="live-rows"></tbody></table></div></section>
       <button type="button" id="show-guide" class="guide-toggle" data-i18n="showGuide"></button>
@@ -102,12 +102,12 @@ async function dashboard(app) {
       $("cost").textContent = money(usage.costUsd)
       $("cost-note").textContent = i18next.t(usage.incomplete ? "costIncomplete" : "costNote")
       const maximum = Math.max(1, ...usage.days.map(row => row.requests))
-      $("trend").replaceChildren(...usage.days.map(row => {
+      $("trend").replaceChildren(...usage.days.map((row, index) => {
         const item = document.createElement("li"), bar = document.createElement("div"), label = document.createElement("span")
         bar.style.setProperty("--value", `${row.requests / maximum * 100}%`)
         bar.setAttribute("aria-label", `${row.date}: ${number(row.requests)}`)
         bar.title = `${row.date}: ${number(row.requests)}`
-        label.textContent = row.date.slice(5)
+        label.textContent = index % Math.ceil(usage.days.length / 7) === 0 ? row.date.slice(5) : "\u00a0"
         item.append(bar, label); return item
       }))
       if (!usage.days.length) $("trend").textContent = i18next.t("noRequests")

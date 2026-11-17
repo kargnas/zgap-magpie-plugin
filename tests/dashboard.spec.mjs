@@ -15,7 +15,7 @@ test("sandboxed dashboard transitions between sign-in, data, errors and sign-out
     if (fail) return Response.json({ error: "unavailable" }, { status: 503 })
     if (url.pathname.endsWith("/live")) return Response.json({ email: "fixture@example.com", inflight: [{ model: "publisher/active", state: "streaming" }], recent: [] })
     return Response.json({ email: "fixture@example.com", requests: 12, inputTokens: 123456, outputTokens: 12345, costUsd: null, incomplete: true,
-      days: [{ date: "2026-11-17", requests: 12 }], models: [{ model: "publisher/sample", requests: 12, outputTokens: 12345, costUsd: null }] })
+      days: Array.from({ length: 30 }, (_, i) => ({ date: `2026-11-${String(i + 1).padStart(2, "0")}`, requests: i + 1 })), models: [{ model: "publisher/sample", requests: 12, outputTokens: 12345, costUsd: null }] })
   } })
   const parent = http.createServer((request, response) => {
     response.setHeader("content-type", "text/html; charset=utf-8")
@@ -39,6 +39,10 @@ test("sandboxed dashboard transitions between sign-in, data, errors and sign-out
     await expect(frame.locator("#requests")).toHaveText("12")
     await expect(frame.locator("#cost")).toHaveText("—")
     await expect(frame.locator("#live-rows")).toContainText("publisher/active")
+    await expect(frame.locator("#model-rows")).toBeHidden()
+    await frame.locator("#model-details summary").click()
+    await expect(frame.locator("#model-rows")).toContainText("publisher/sample")
+    await frame.locator("#model-details summary").click()
     await frame.locator('[data-days="30"]').click()
     await expect.poll(() => calls.some(call => call.days === "30")).toBe(true)
     await page.setViewportSize({ width: 390, height: 844 })

@@ -618,3 +618,7 @@ li:focus {
 		flex: 1;
 	}
 }
+
+#activity-title { font-size: 32px; letter-spacing: -1px; }
+#model-details summary { cursor: pointer; font-size: 17px; font-weight: 650; }
+.trend li span { max-width: 100%; overflow: hidden; }
