@@ -13,6 +13,10 @@ const ASSETS = new Map([
 // The host supplies its actual config directory, including portable and isolated installations.
 // Read only ZGAP entries; magpie alone writes, renews and removes these credentials.
 export async function readAccounts(directory) {
+  try {
+    const settings = JSON.parse(await readFile(path.join(directory, "settings.json"), "utf8"))
+    if (settings.noAccountDiscovery === true) return []
+  } catch (error) { if (error.code !== "ENOENT") throw error }
   let text
   try { text = await readFile(path.join(directory, "plugin-auth.json"), "utf8") }
   catch (error) { if (error.code === "ENOENT") return []; throw error }
@@ -20,7 +24,7 @@ export async function readAccounts(directory) {
   if (!saved || typeof saved !== "object" || Array.isArray(saved)) throw new Error("Invalid magpie sign-in store")
   return Object.entries(saved).filter(([key, value]) => (key === "zgap" || key.startsWith("zgap#")) && value?.type === "oauth" && typeof value.access === "string" && value.access)
     .sort(([a], [b]) => a === "zgap" ? -1 : b === "zgap" ? 1 : a.localeCompare(b))
-    .map(([key, auth]) => ({ id: createHash("sha256").update(key).digest("hex").slice(0, 20), label: typeof auth.accountId === "string" ? auth.accountId : "ZGAP", auth }))
+    .map(([key, auth]) => ({ id: createHash("sha256").update(`${key}\0${auth.accountId ?? ""}`).digest("hex").slice(0, 20), label: typeof auth.accountId === "string" ? auth.accountId : "ZGAP", auth }))
 }
 
 export async function startDashboard({ directory, port, fetchImpl = fetch }) {

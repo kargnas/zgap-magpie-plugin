@@ -69,9 +69,9 @@ async function start() {
   translate()
   let redraw = () => {}
   magpie.onTheme(async ({ lang }) => { await i18next.changeLanguage(lang); translate(); redraw() })
-  if (document.querySelector('meta[name="zgap-page-token"]')) redraw = await dashboard(app)
   document.getElementById("initializing").remove()
   app.hidden = false
+  if (document.querySelector('meta[name="zgap-page-token"]')) redraw = await dashboard(app)
   magpie.onAction((value) => {
     action = value
     app.classList.add("show-guide")
@@ -132,6 +132,8 @@ async function dashboard(app) {
     app.classList.remove("signed-in", "show-guide")
     $("usage-content").hidden = true
     rows("live-rows", [])
+    $("account-email").textContent = ""
+    $("live-count").textContent = ""
   }
   async function refresh(force = false) {
     if (busy && !force) return
@@ -147,9 +149,11 @@ async function dashboard(app) {
       const next = session.accounts.find(row => row.id === account) ?? session.accounts[0]
       if (next.id !== account) { usage = live = undefined; lastUsage = 0; account = next.id; rows("live-rows", []); $("usage-content").hidden = true }
       $("account-select").replaceChildren(...session.accounts.map(row => { const option = new Option(row.label, row.id); option.selected = row.id === account; return option }))
+      $("account-email").textContent = next.label
+      $("activity").hidden = false; app.classList.add("signed-in")
       const needUsage = force || !usage || Date.now() - lastUsage >= 30000
       if (needUsage) { usage = undefined; $("usage-content").hidden = true; $("usage-loading").hidden = false; $("usage-error").hidden = true }
-      live = undefined; rows("live-rows", []); $("live-error").hidden = true
+      live = undefined; rows("live-rows", []); $("live-error").hidden = true; $("live-count").textContent = ""
       $("live-status").textContent = i18next.t("loadingUsage")
       const query = new URLSearchParams({ account, days, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone })
       const results = await Promise.allSettled([api(`live?${query}`, signal), ...(needUsage ? [api(`usage?${query}`, signal)] : [])])
@@ -171,13 +175,14 @@ async function dashboard(app) {
       if (current !== generation || signal.aborted) return
       $("activity").hidden = false; app.classList.add("signed-in")
       usage = live = undefined; $("usage-content").hidden = true; rows("live-rows", [])
+      $("account-email").textContent = ""; $("live-count").textContent = ""; $("live-status").textContent = i18next.t("offline")
       $("usage-error").hidden = false; $("usage-error").textContent = i18next.t("loadFailed")
     } finally {
       if (current === generation) { busy = false; $("usage-loading").hidden = true; $("refresh").disabled = false }
     }
   }
   $("account-select").setAttribute("aria-label", i18next.t("account"))
-  $("account-select").onchange = event => { account = event.target.value; usage = live = undefined; lastUsage = 0; void refresh(true) }
+  $("account-select").onchange = event => { account = event.target.value; usage = live = undefined; lastUsage = 0; $("usage-content").hidden = true; rows("live-rows", []); $("account-email").textContent = ""; void refresh(true) }
   for (const button of app.querySelectorAll("[data-days]")) button.onclick = () => {
     days = button.dataset.days
     for (const other of app.querySelectorAll("[data-days]")) other.setAttribute("aria-pressed", String(other === button))
@@ -192,7 +197,7 @@ async function dashboard(app) {
   }
   magpie.onVisibility(schedule)
   await refresh()
-  schedule(magpie.visible)
+  if (magpie.visible) timer = setInterval(() => void refresh(), 5000)
   return render
 }
 start()

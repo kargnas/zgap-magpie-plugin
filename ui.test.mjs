@@ -20,7 +20,7 @@ test("every locale covers the UI, native labels and manifest limits", async () =
   const { auth } = await ZgapPlugin()
   const keys = Object.keys(translations.en).sort()
   for (const [lang, strings] of Object.entries(translations)) {
-    assert.ok(keys.every((key) => key in strings || key in translations.en), lang)
+    assert.deepEqual(Object.keys(strings).sort(), keys, lang)
     assert.ok(Object.values(strings).every((value) => typeof value === "string" && value.trim()), lang)
     assert.equal(pkg.magpie.summary[lang], strings.summary)
     assert.ok(Buffer.byteLength(strings.summary) <= 300, lang)

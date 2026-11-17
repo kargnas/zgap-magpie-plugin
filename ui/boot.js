@@ -1,5 +1,4 @@
 (async () => {
-  if (!magpie.options) return
   await magpie.ready
   const options = await magpie.options.get()
   const port = options.port ?? globalThis.zgapDashboardPort

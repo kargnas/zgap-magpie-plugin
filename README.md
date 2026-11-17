@@ -24,8 +24,9 @@ open the relevant step. The plugin follows magpie’s light/dark theme and langu
 After sign-in, the same page becomes a compact activity dashboard. It shows the selected ZGAP account’s
 24-hour, 7-day or 30-day request totals, token counts, current-catalog cost estimate, daily trend,
 model breakdown and live requests. The connection guide remains available under **Show connection guide**.
-The dashboard asks ZGAP for only the signed-in account’s data; it does not read prompts, API keys or
-refresh tokens. If the account is signed out, the page returns to the connection guide.
+The dashboard asks ZGAP for only the signed-in account’s data, across that account’s devices and API
+keys. OAuth credentials stay in the local service and never reach the page. If the account is signed
+out, the page returns to the connection guide.
 
 If you already installed the plugin, use **Plugins → Installed → ZGAP → Update** to get the current
 icon and guide.
@@ -43,7 +44,9 @@ on the same computer, and signing in here again updates the same session.
 
 ## How it works
 
-- **Models**: read from ZGAP's `/v1/models` once you are signed in.
+- **Models**: read from ZGAP's `/v1/models` once you are signed in. Display names are separate from
+  request IDs. Context and output limits, input/output modalities, reasoning, tools and temperature
+  support come from the catalog; unknown values remain unspecified.
 - **Requests**: ZGAP serves every model on Chat Completions, Messages and Responses, so magpie relays each
   agent's request in the protocol the agent sent it in. The plugin adds the current access token.
 - **Tokens**: the access token lasts 24 hours. magpie renews it before it runs out with the refresh token,
@@ -70,8 +73,13 @@ npm test
 npm run test:ui
 ```
 
-The page and panel are static files served in magpie’s sandbox, with no extra read permissions or
-network access. Authentication stays in magpie’s native sign-in dialog. Translations live in
+The sidebar entry opens the plugin’s loopback service through magpie’s page-service support. The
+service reads ZGAP entries from `plugin-auth.json` inside the config directory supplied by magpie;
+magpie owns token renewal and writes. It binds only to `127.0.0.1`, checks Host and Origin, and requires
+a random page token for its read-only APIs. It can request only the two ZGAP dashboard endpoints.
+The service’s default port is declared by `scripts/build-ui.mjs`; the plugin’s `port` option can move it
+if occupied. A port conflict is an error. The settings panel stays static. Authentication stays in
+magpie’s native sign-in dialog. Translations live in
 `locales/` and use i18next; magpie also reads the translated card summaries and sign-in labels.
 `ui/icon.svg` is the icon source. `npm run build:ui` embeds it in the manifest, generates the native
 labels and browser translation bundle, and copies i18next with its license into `ui/vendor/`.

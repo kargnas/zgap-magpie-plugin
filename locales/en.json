@@ -57,5 +57,6 @@
   "updated": "Updated {{time}}",
   "offline": "Live updates unavailable",
   "loadFailed": "Activity could not be loaded. Try again.",
-  "showGuide": "Show connection guide"
+  "showGuide": "Show connection guide",
+  "period": "Period"
 }

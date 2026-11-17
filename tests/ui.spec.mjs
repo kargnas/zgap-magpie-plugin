@@ -10,13 +10,13 @@ addEventListener('message',e=>{if(e.source!==parent)return; const m=e.data;
 if(m.theme){document.documentElement.dataset.theme=m.theme.dark?'dark':'light'; document.documentElement.lang=m.theme.lang;done(m.theme);themes.forEach(f=>f(m.theme));}
 if(m.action)action?.(m.action);}); parent.postMessage('ready','*');`
 
-async function mount(page, file = "index.html") {
+async function mount(page, file = "dashboard.html") {
   const errors = []
   page.on("pageerror", (error) => errors.push(error.message))
   await page.route("http://magpie.test/**", async (route) => {
     const pathname = new URL(route.request().url()).pathname
     if (pathname === "/") return route.fulfill({ contentType: "text/html", body: `<!doctype html><style>body{margin:0}iframe{display:block;border:0;width:100%;height:1500px}</style><script>addEventListener('message',e=>{if(e.data==='ready')e.source.postMessage({theme:{dark:false,lang:'en'}},'*')})</script><iframe sandbox="allow-scripts" src="/ui/${file}"></iframe>` })
-    if (pathname.endsWith("/_magpie/bridge.js")) return route.fulfill({ contentType: "text/javascript", body: bridge })
+    if (pathname.endsWith("/_magpie/bridge.js") || pathname.endsWith("/dashboard-bridge.js")) return route.fulfill({ contentType: "text/javascript", body: bridge })
     const relative = pathname.replace(/^\/ui\//, "")
     const contentType = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml" }[path.extname(relative)]
     await route.fulfill({ contentType, body: await readFile(path.join(root, relative)), headers: { "Content-Security-Policy": "default-src 'none'; script-src http://magpie.test/ui/; style-src http://magpie.test/ui/ 'unsafe-inline'; img-src http://magpie.test/ui/ data:; connect-src 'none'; sandbox allow-scripts" } })
