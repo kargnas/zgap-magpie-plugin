@@ -1,0 +1,20 @@
+{
+  "name": "zgap-magpie-plugin",
+  "version": "0.1.0",
+  "description": "Sign in to ZGAP (ai-proxy.zz.gg) and use its models in magpie",
+  "type": "module",
+  "main": "./index.mjs",
+  "files": ["index.mjs", "README.md", "LICENSE"],
+  "keywords": ["magpie", "magpie-plugin", "zgap"],
+  "license": "GPL-3.0-only",
+  "repository": { "type": "git", "url": "git+https://github.com/kargnas/zgap-magpie-plugin.git" },
+  "homepage": "https://github.com/kargnas/zgap-magpie-plugin#readme",
+  "scripts": { "test": "node --test" },
+  "magpie": {
+    "name": "ZGAP",
+    "summary": {
+      "en": "Sign in to ZGAP (ai-proxy.zz.gg) with your Google account and use its models from any agent magpie serves.",
+      "zh": "用 Google 账号登录 ZGAP（ai-proxy.zz.gg），让 magpie 服务的所有代理使用其中的模型。"
+    }
+  }
+}
