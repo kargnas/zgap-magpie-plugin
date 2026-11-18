@@ -1,6 +1,10 @@
 import assert from "node:assert/strict"
 import { createHash } from "node:crypto"
 import { readFileSync } from "node:fs"
+import { mkdtemp, rm } from "node:fs/promises"
+import http from "node:http"
+import os from "node:os"
+import path from "node:path"
 import { afterEach, test } from "node:test"
 import { ZgapPlugin } from "./index.mjs"
 
@@ -214,4 +218,32 @@ test("speed tiers in ZGAP's list reach magpie as serviceTiers, and a model witho
   assert.deepEqual(rows["openai/gpt-imaginary-9"].serviceTiers, tiers)
   assert.equal("serviceTiers" in rows["openai/gpt-no-tiers"], false)
   assert.equal("serviceTiers" in rows["odd/model"], false)
+})
+
+// magpie keeps the plugin host it replaces (a Bun update, a plugin installed, updated or set) until
+// that host's replies end, so the new host loads ZGAP while the old one still holds the page's port.
+test("ZGAP loads while another host holds the page's port, and the page takes the port once it is free", { timeout: 10_000 }, async (t) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "zgap-page-"))
+  t.after(() => rm(directory, { recursive: true, force: true }))
+  const oldHost = http.createServer()
+  await new Promise((resolve) => oldHost.listen(0, "127.0.0.1", resolve))
+  oldHost.unref()
+  const { port } = oldHost.address()
+  const waiting = new Promise((resolve) => t.mock.method(console, "error", (line) => {
+    if (String(line).includes(`port ${port} is in use`)) resolve()
+  }))
+
+  const { auth, provider } = await ZgapPlugin({ magpie: {}, directory }, { port })
+  assert.equal(auth.provider, "zgap")
+  assert.equal(provider.id, "zgap")
+
+  // The old host lets go only after the page has found the port taken.
+  await waiting
+  await new Promise((resolve) => oldHost.close(resolve))
+  let page
+  for (const deadline = Date.now() + 5000; Date.now() < deadline && !page?.ok; await new Promise((resolve) => setTimeout(resolve, 100))) {
+    page = await fetch(`http://127.0.0.1:${port}/`).catch(() => undefined)
+  }
+  assert.equal(page?.status, 200)
+  assert.match(await page.text(), /name="zgap-page-token"/)
 })

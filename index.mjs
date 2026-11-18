@@ -251,7 +251,12 @@ async function models(provider, { auth }) {
 }
 
 export async function ZgapPlugin(input, options = {}) {
-  if (input?.magpie && input.directory) dashboard ??= await startDashboard({ directory: input.directory, port: options.port ?? MANIFEST.magpie.page.service.port })
+  // The page is an extra and never decides whether ZGAP loads. Without this plugin loaded, magpie sends
+  // ZGAP requests with no token: each is a 401, and magpie then shows the account as signed out.
+  if (input?.magpie && input.directory) {
+    dashboard ??= startDashboard({ directory: input.directory, port: options.port ?? MANIFEST.magpie.page.service.port })
+      .catch((error) => console.error(`ZGAP page: ${error.message}`))
+  }
   return {
     config: async (config) => {
       config.provider ??= {}

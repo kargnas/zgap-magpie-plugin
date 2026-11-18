@@ -122,7 +122,25 @@ export async function startDashboard({ directory, port, fetchImpl = fetch }) {
       console.error("ZGAP dashboard request failed:", error.name)
     }
   })
-  await new Promise((resolve, reject) => { server.once("error", reject); server.listen(port, "127.0.0.1", resolve) })
+  // magpie keeps the plugin host it replaces (a Bun update, a plugin installed, updated or set) until
+  // that host's replies end, up to 10 minutes, and the old host holds this port until then. Waiting
+  // for it brings the page back without another restart.
+  const listen = () => new Promise((resolve, reject) => {
+    const onError = (error) => { server.off("listening", onListening); reject(error) }
+    const onListening = () => { server.off("error", onError); resolve() }
+    server.once("error", onError).once("listening", onListening).listen(port, "127.0.0.1")
+  })
+  for (let waited = false; ; waited = true) {
+    try {
+      await listen()
+      if (waited) console.error(`ZGAP page: port ${port} is free again`)
+      break
+    } catch (error) {
+      if (error.code !== "EADDRINUSE") throw error
+      if (!waited) console.error(`ZGAP page: port ${port} is in use, likely by the magpie plugin host being replaced; waiting for it`)
+      await new Promise((resolve) => setTimeout(resolve, 1000).unref())
+    }
+  }
   server.unref()
   return server
 }
