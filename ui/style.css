@@ -22,6 +22,10 @@ p, .edition { color: var(--muted); }
 summary { cursor: pointer; }
 .privacy p { margin-top: 8px; }
 #initializing { padding: 16px; }
+/* The sidebar page sits in magpie's own page margin and hands over to the console, which starts at
+   the frame's edge. Its loading line is drawn where the console's is, not in the bridge's body padding. */
+body.page { padding: 0; }
+.page #initializing { padding: 20px 0; }
 .spinner { width: 14px; height: 14px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(1turn); } }
 @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }

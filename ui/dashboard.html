@@ -7,7 +7,8 @@
   <!--SESSION-->
   <title>ZGAP</title>
   <style>
-    body{margin:0;font:13px system-ui}#initializing{display:flex;align-items:center;gap:.6rem;padding:1.25rem}
+    /* magpie's window already pads the page, so the console starts at the frame's edge: the loading line does too */
+    body{margin:0;font:13px system-ui}#initializing{display:flex;align-items:center;gap:.6rem;padding:1.25rem 0}
     #initializing[role=status]::before{content:"";width:.8rem;height:.8rem;border:2px solid GrayText;border-right-color:transparent;border-radius:50%;animation:spin .8s linear infinite}
     @keyframes spin{to{transform:rotate(1turn)}}
     @media(prefers-reduced-motion:reduce){#initializing::before{animation:none}}
