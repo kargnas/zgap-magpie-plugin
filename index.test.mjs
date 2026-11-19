@@ -220,6 +220,22 @@ test("speed tiers in ZGAP's list reach magpie as serviceTiers, and a model witho
   assert.equal("serviceTiers" in rows["odd/model"], false)
 })
 
+test("reasoning effort levels in ZGAP's list reach magpie as variants, and a model without them gets none", async () => {
+  const { provider } = await ZgapPlugin()
+  stub(() => json(200, { data: [
+    { id: "relay/thinker", reasoning: true, reasoning_efforts: ["low", "high", "max"] },
+    { id: "relay/plain", reasoning: true },
+    { id: "relay/odd", reasoning: true, reasoning_efforts: "high" },
+    { id: "relay/junk", reasoning: true, reasoning_efforts: [1, "", "low"] },
+  ] }))
+  const rows = await provider.models({ models: {} }, { auth: { type: "oauth", access: "token" } })
+  assert.deepEqual(Object.keys(rows["relay/thinker"].variants), ["low", "high", "max"])
+  assert.equal(rows["relay/thinker"].capabilities.reasoning, true)
+  assert.equal("variants" in rows["relay/plain"], false)
+  assert.equal("variants" in rows["relay/odd"], false)
+  assert.deepEqual(Object.keys(rows["relay/junk"].variants), ["low"])
+})
+
 // magpie keeps the plugin host it replaces (a Bun update, a plugin installed, updated or set) until
 // that host's replies end, so the new host loads ZGAP while the old one still holds the page's port.
 test("ZGAP loads while another host holds the page's port, and the page takes the port once it is free", { timeout: 10_000 }, async (t) => {

@@ -247,7 +247,18 @@ async function models(provider, { auth }) {
     // magpie offers Fast and Ultrafast only on a model whose serviceTiers name them. ZGAP lists the
     // tiers its accounts serve the model at, as Codex gets them; magpie reads each object's id.
     ...(Array.isArray(m.service_tiers) ? { serviceTiers: m.service_tiers } : {}),
+    ...variantsOf(m.reasoning_efforts),
   }]))
+}
+
+// magpie reads a reasoning model's effort levels from the names of its OpenCode variants; without
+// them it guesses the levels from its own models.dev copy by model name, which knows no reseller's
+// model. ZGAP lists the levels the model's upstream says it takes. magpie never reads a variant's
+// value, so each is empty.
+function variantsOf(efforts) {
+  if (!Array.isArray(efforts)) return {}
+  const levels = efforts.filter((level) => typeof level === "string" && level)
+  return levels.length ? { variants: Object.fromEntries(levels.map((level) => [level, {}])) } : {}
 }
 
 export async function ZgapPlugin(input, options = {}) {
