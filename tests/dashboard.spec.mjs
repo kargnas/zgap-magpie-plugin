@@ -88,8 +88,9 @@ test("the console guide, live events and filtered account statistics work in Mag
     await expect(live).toHaveAttribute("aria-pressed", "true")
     await expect(f.getByText("My request river", { exact: true })).toBeVisible()
     // Remaining usage takes the place of the Live title row.
-    await expect(f.getByRole("heading", { name: "Remaining usage" })).toBeVisible()
-    await expect(f.getByRole("region", { name: "first-provider" })).toContainText("75%")
+    const remaining = f.getByRole("region", { name: "Remaining usage" })
+    await expect(remaining).toContainText("first-provider")
+    await expect(remaining).toContainText("75%")
     await expect(f.getByText("Live", { exact: true })).toHaveCount(0)
     await expect.poll(() => streams.has("first")).toBe(true)
     streams.get("first")("start", { id: "fixture-live", model: "fixture-live-model", tsStart: Date.now(), state: "streaming", sourceLabel: "Fixture" })
