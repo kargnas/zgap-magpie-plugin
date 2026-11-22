@@ -1,6 +1,6 @@
 {
   "name": "zgap-magpie-plugin",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Sign in to ZGAP (ai-proxy.zz.gg) and use its models in magpie",
   "type": "module",
   "main": "./index.mjs",

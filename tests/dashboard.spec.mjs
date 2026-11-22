@@ -33,6 +33,7 @@ test("the console guide, live events and filtered account statistics work in Mag
       }), { headers: { "content-type": "text/event-stream" } })
     }
     if (file === "account-equivalents") return Response.json({ days: 7, providers: [] })
+    if (file === "remaining-usage") return Response.json({ generatedAt: new Date().toISOString(), providers: [{ provider: name + "-provider", windows: [{ id: "weekly", label: "Weekly", usedPercent: 25, recharges: [] }] }] })
     expect(file).toBe("usage-stats")
     const axis = url.searchParams.get("groupBy"), bucket = url.searchParams.get("bucket")
     const row = { [axis]: name + "-fixture", model: "fixture/model", requests: 12, input_tokens: 100, output_tokens: 40,
@@ -86,6 +87,10 @@ test("the console guide, live events and filtered account statistics work in Mag
     const live = f.getByRole("button", { name: "Live activity" }), stats = f.getByRole("button", { name: "Usage stats" })
     await expect(live).toHaveAttribute("aria-pressed", "true")
     await expect(f.getByText("My request river", { exact: true })).toBeVisible()
+    // Remaining usage takes the place of the Live title row.
+    await expect(f.getByRole("heading", { name: "Remaining usage" })).toBeVisible()
+    await expect(f.getByRole("region", { name: "first-provider" })).toContainText("75%")
+    await expect(f.getByText("Live", { exact: true })).toHaveCount(0)
     await expect.poll(() => streams.has("first")).toBe(true)
     streams.get("first")("start", { id: "fixture-live", model: "fixture-live-model", tsStart: Date.now(), state: "streaming", sourceLabel: "Fixture" })
     await expect(f.getByRole("combobox", { name: "Filter by model" }).locator("option", { hasText: "fixture-live-model" })).toHaveCount(1)

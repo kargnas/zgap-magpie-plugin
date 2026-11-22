@@ -56,6 +56,10 @@ test("dashboard proxies usage with the selected OAuth account and opaque page to
     assert.equal(calls[0].headers.authorization, "Bearer access-one")
     assert.equal(calls[0].url, "https://ai-proxy.zz.gg/v1/dashboard/usage-stats?groupBy=model&filter=source%3Aa&filter=source%3Ab")
     assert.equal(JSON.stringify(await usage.json()).includes("access-one"), false)
+    const remaining = await fetch(`http://127.0.0.1:${port}/api/remaining-usage?account=${account}`, { headers: { origin: "null", "x-zgap-page-token": token } })
+    assert.equal(remaining.status, 200)
+    assert.equal(calls.at(-1).url, "https://ai-proxy.zz.gg/v1/dashboard/remaining-usage")
+    assert.equal(calls.at(-1).headers.authorization, "Bearer access-one")
   } finally { server.close() }
 })
 

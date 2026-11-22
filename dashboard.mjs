@@ -13,7 +13,7 @@ const ASSETS = new Map([
 ])
 
 const CONSOLE_ASSETS = new Map([["/console.js", "text/javascript"], ["/console.css", "text/css"]])
-const READS = new Set(["/api/usage-stats", "/api/account-equivalents", "/api/events"])
+const READS = new Set(["/api/usage-stats", "/api/account-equivalents", "/api/remaining-usage", "/api/events"])
 
 // The host supplies its actual config directory, including portable and isolated installations.
 // Read only ZGAP entries; magpie alone writes, renews and removes these credentials.
