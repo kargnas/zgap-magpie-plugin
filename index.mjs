@@ -270,6 +270,10 @@ const UPSTREAMS = { anthropic: "claude", openai: "codex", moonshot: "kimi", "x-a
 // The windows ZGAP reports for an upstream's whole account, by ID, and how many seconds each runs.
 // magpie ranks a week ahead of the five hours in it and treats the five hours as a rate cap.
 const SPANS = { five_hour: 5 * 3600, session: 5 * 3600, seven_day: 7 * 86400, weekly: 7 * 86400 }
+// How long a good remaining-usage read stands. A running magpie (the app, `magpie serve`) reads every
+// account's usage each minute, and these means over ZGAP's accounts move slowly, so 3 minutes is
+// enough. Each magpie command starts its own plugin host, so a `magpie quota` run always reads afresh.
+const USAGE_KEPT_MS = 3 * 60_000
 
 // magpie's auth.usage hook: `magpie quota`, the Usage page and Quota first routing read it.
 // ZGAP's remaining usage is the gateway's, not this account's own: per upstream, each window's
@@ -278,9 +282,19 @@ const SPANS = { five_hour: 5 * 3600, session: 5 * 3600, seven_day: 7 * 86400, we
 // bring back a few percent each, so no time renews the whole window. Without resetsAt, magpie takes
 // a window to renew a full span from now, so Quota first spends accounts renewing sooner first. A
 // 5-hour window at 90% used, or any window at 98%, still puts ZGAP behind the others.
-async function usage(getAuth, provider, { signal } = {}) {
+// kept holds this plugin's good reads by access token: ZGAP answers each sign-in on its own (403
+// for one it no longer serves), so one account's read never stands for another's, and a renewed
+// token reads afresh. A failed read is not kept, so magpie's next read tries ZGAP again.
+async function usage(kept, getAuth, provider, { signal } = {}) {
   const auth = await getAuth()
   if (auth?.type !== "oauth" || typeof auth.access !== "string") throw new SignInExpired("not signed in")
+  const ids = Object.keys(provider?.models ?? {})
+  const now = Date.now()
+  for (const [token, read] of kept) if (now - read.at >= USAGE_KEPT_MS) kept.delete(token)
+  const read = kept.get(auth.access)
+  // A kept read says nothing new about the sign-in ("kept"): without it magpie would take the read as
+  // a clean one and clear the account's expired mark, though the token may have lapsed since.
+  if (read) return { windows: read.providers.flatMap((entry) => windowsOf(entry, ids)), signIn: "kept" }
   const res = await fetch(`${BASE}/dashboard/remaining-usage`, {
     headers: { accept: "application/json", authorization: `Bearer ${auth.access}` },
     redirect: "error",
@@ -291,7 +305,7 @@ async function usage(getAuth, provider, { signal } = {}) {
   // A 401 here leaves the sign-in to the next model request, which renews or expires it as before.
   if (!res.ok) throw new Error(`ZGAP: remaining usage failed (${body?.error ?? `HTTP ${res.status}`})`)
   if (!Array.isArray(body?.providers)) throw new Error("ZGAP: the remaining usage is not valid")
-  const ids = Object.keys(provider?.models ?? {})
+  kept.set(auth.access, { at: Date.now(), providers: body.providers })
   return { windows: body.providers.flatMap((entry) => windowsOf(entry, ids)) }
 }
 
@@ -321,6 +335,7 @@ export async function ZgapPlugin(input, options = {}) {
     dashboard ??= startDashboard({ directory: input.directory, port: options.port ?? MANIFEST.magpie.page.service.port })
       .catch((error) => console.error(`ZGAP page: ${error.message}`))
   }
+  const usageReads = new Map()
   return {
     config: async (config) => {
       config.provider ??= {}
@@ -336,7 +351,7 @@ export async function ZgapPlugin(input, options = {}) {
       rotating: true,
       methods: [{ type: "oauth", label: SIGN_IN_LABELS.en, labels: SIGN_IN_LABELS, authorize }],
       refresh,
-      usage,
+      usage: (...args) => usage(usageReads, ...args),
       loader: async (getAuth) => ({ baseURL: BASE, fetch: (input, init) => send(getAuth, input, init) }),
     },
   }

@@ -62,7 +62,9 @@ on the same computer, and signing in here again updates the same session.
   never hold back routing. ZGAP does not say when its pooled windows reset, so magpie takes each window to renew a
   full span from now, and Quota first spends accounts that renew sooner first. A 5-hour window at 90% used, or any
   window at 98%, still puts ZGAP behind the others. A window no ZGAP account measured is left out, and a failed read
-  shows as an error, never as 0% used.
+  shows as an error, never as 0% used. While the app or `magpie serve` runs, each sign-in reads it at most once
+  every 3 minutes, so the figures there can be up to 3 minutes old; each `magpie quota` run reads it afresh. A failed
+  read is not kept, and magpie's next read asks ZGAP again.
 - **Tokens**: the access token lasts 24 hours. magpie renews it before it runs out with the refresh token,
   which ZGAP replaces on every renewal and keeps valid for 30 days.
 
