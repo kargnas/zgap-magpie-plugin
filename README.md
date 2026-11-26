@@ -92,8 +92,8 @@ npm run test:ui
 The sidebar entry opens the plugin’s loopback service through magpie’s page-service support. The
 service reads ZGAP entries from `plugin-auth.json` inside the config directory supplied by magpie;
 magpie owns token renewal and writes. It binds only to `127.0.0.1`, checks Host and Origin, and requires
-a random page token for its read-only APIs. It serves the JS and CSS built by the ZGAP console and forwards only the three personal dashboard
-reads (live events, usage statistics and weekly report). The asset requests carry no credentials.
+a random page token for its read-only APIs. It serves the JS and CSS built by the ZGAP console and forwards only four dashboard reads: the
+account's live events, usage statistics and weekly report, and ZGAP's remaining usage. The asset requests carry no credentials.
 No OAuth token is sent to the page or placed in a URL; the stream closes on sign-out or renewal.
 The service’s default port is declared by `scripts/build-ui.mjs`. When the port is taken, ZGAP still
 signs in and serves requests, and the page waits for the port: magpie keeps a plugin host it replaced
