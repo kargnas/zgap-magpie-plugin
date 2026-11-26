@@ -246,6 +246,8 @@ const remaining = {
       win("seven_day", "Weekly", null, 604800, true),
       win("limit-fable", "Fable", 95, null, false),
       win("seven_day_oauth_apps", "OAuth apps", 40, null, false),
+      // A capacity window lists its models. Its label alone would also match claude-mythos-preview.
+      { ...win("capacity-mythos", "Mythos", 98, 604800, false), models: ["anthropic/claude-mythos-5-2", "anthropic/claude-mythos-5-1"] },
     ] },
     { provider: "codex", windows: [
       win("weekly", "Weekly", 62, 604800, true),
@@ -258,7 +260,7 @@ const remaining = {
     { provider: "antigravity", windows: [win("gemini-3-pro-high", "Gemini 3 Pro · gemini-3-pro-high", 50, null, false)] },
   ],
 }
-const zgapModels = Object.fromEntries(["anthropic/claude-fable-5-2", "anthropic/claude-sonnet-5-5", "openai/gpt-6.2-sol", "openai/gpt-5.3-codex-spark", "moonshot/kimi-k3", "x-ai/grok-5", "laysoai/glm-5"].map((id) => [id, { id }]))
+const zgapModels = Object.fromEntries(["anthropic/claude-fable-5-2", "anthropic/claude-sonnet-5-5", "anthropic/claude-mythos-5-2", "anthropic/claude-mythos-preview", "openai/gpt-6.2-sol", "openai/gpt-5.3-codex-spark", "moonshot/kimi-k3", "x-ai/grok-5", "laysoai/glm-5"].map((id) => [id, { id }]))
 
 test("usage reads ZGAP's remaining usage into windows that count only the models of their upstream", async () => {
   const { auth } = await ZgapPlugin()
@@ -266,12 +268,14 @@ test("usage reads ZGAP's remaining usage into windows that count only the models
   const read = await auth.usage(async () => ({ type: "oauth", access: "token" }), { id: "zgap", models: zgapModels }, {})
   assert.equal(calls[0].url, "https://ai-proxy.zz.gg/v1/dashboard/remaining-usage")
   assert.equal(calls[0].headers.get("authorization"), "Bearer token")
-  const claude = ["anthropic/claude-fable-5-2", "anthropic/claude-sonnet-5-5"]
+  const claude = ["anthropic/claude-fable-5-2", "anthropic/claude-sonnet-5-5", "anthropic/claude-mythos-5-2", "anthropic/claude-mythos-preview"]
   assert.deepEqual(read, { windows: [
     { name: "claude · Session", used: 18.2, span: 18000, models: claude },
     // Weekly was measured on no account: left out, not 0% used.
     { name: "claude · Fable", used: 95, models: ["anthropic/claude-fable-5-2"] },
     { name: "claude · OAuth apps", used: 40, aside: true },
+    // Only the listed models it serves: mythos-5-1 is not in the model list.
+    { name: "claude · Mythos", used: 98, span: 604800, models: ["anthropic/claude-mythos-5-2"] },
     { name: "codex · Weekly", used: 62, span: 604800, models: ["openai/gpt-6.2-sol", "openai/gpt-5.3-codex-spark"] },
     { name: "codex · GPT-5.3-Codex-Spark · Weekly", used: 100, span: 604800, models: ["openai/gpt-5.3-codex-spark"] },
     { name: "codex · Code review · Weekly", used: 99, span: 604800, aside: true },

@@ -323,8 +323,12 @@ function windowsOf(entry, ids) {
     // Codex model's own "GPT-5.3-Codex-Spark · Weekly"). One that names none (Codex's code review,
     // Claude's OAuth apps, xAI's on-demand cap) is shown but set aside, so it never holds back the
     // upstream's other models.
+    // A window that lists its models (a capacity window: only the accounts that serve the models an
+    // admin picked) counts exactly those models, whatever it is called.
     const named = label.split(" · ")[0].toLowerCase()
-    const models = w.accountWide === true ? served : served.filter((id) => named && id.toLowerCase().includes(named))
+    const listed = Array.isArray(w.models) ? new Set(w.models.map((id) => String(id).toLowerCase())) : null
+    const models = listed ? served.filter((id) => listed.has(id.toLowerCase()))
+      : w.accountWide === true ? served : served.filter((id) => named && id.toLowerCase().includes(named))
     return { name: `${upstream} · ${label}`, used: w.usedPercent, ...(span ? { span } : {}), ...(models.length ? { models } : { aside: true }) }
   })
 }
