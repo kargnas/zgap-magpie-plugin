@@ -261,6 +261,59 @@ function variantsOf(efforts) {
   return levels.length ? { variants: Object.fromEntries(levels.map((level) => [level, {}])) } : {}
 }
 
+// The upstream ZGAP's quota windows are reported under (claude, codex, kimi, xai, ...) for the
+// owner each listed model ID starts with. anthropic, openai and x-ai are aliases ZGAP's quota plugin
+// folds into these names (cliproxy-quota normalizedProvider); moonshot is the owner ZGAP lists native
+// Kimi models under. Any other owner is its own name (zai, or an OpenAI-compatible provider, which
+// has no quota window).
+const UPSTREAMS = { anthropic: "claude", openai: "codex", moonshot: "kimi", "x-ai": "xai" }
+// The windows ZGAP reports for an upstream's whole account, by ID, and how many seconds each runs.
+// magpie ranks a week ahead of the five hours in it and treats the five hours as a rate cap.
+const SPANS = { five_hour: 5 * 3600, session: 5 * 3600, seven_day: 7 * 86400, weekly: 7 * 86400 }
+
+// magpie's auth.usage hook: `magpie quota`, the Usage page and Quota first routing read it.
+// ZGAP's remaining usage is the gateway's, not this account's own: per upstream, each window's
+// usedPercent is the mean share used over the upstream's accounts (null when none was measured).
+// ZGAP leaves out reset times on purpose: accounts renew at their own times, and its recharges
+// bring back a few percent each, so no time renews the whole window. Without resetsAt, magpie takes
+// a window to renew a full span from now, so Quota first spends accounts renewing sooner first. A
+// 5-hour window at 90% used, or any window at 98%, still puts ZGAP behind the others.
+async function usage(getAuth, provider, { signal } = {}) {
+  const auth = await getAuth()
+  if (auth?.type !== "oauth" || typeof auth.access !== "string") throw new SignInExpired("not signed in")
+  const res = await fetch(`${BASE}/dashboard/remaining-usage`, {
+    headers: { accept: "application/json", authorization: `Bearer ${auth.access}` },
+    redirect: "error",
+    signal: AbortSignal.any([AbortSignal.timeout(15_000), ...(signal ? [signal] : [])]),
+  })
+  const body = await res.json().catch(() => null)
+  // A failed read stays an error, not 0% used: magpie then keeps the account's usage unknown.
+  // A 401 here leaves the sign-in to the next model request, which renews or expires it as before.
+  if (!res.ok) throw new Error(`ZGAP: remaining usage failed (${body?.error ?? `HTTP ${res.status}`})`)
+  if (!Array.isArray(body?.providers)) throw new Error("ZGAP: the remaining usage is not valid")
+  const ids = Object.keys(provider?.models ?? {})
+  return { windows: body.providers.flatMap((entry) => windowsOf(entry, ids)) }
+}
+
+function windowsOf(entry, ids) {
+  const upstream = String(entry?.provider ?? "")
+  const served = ids.filter((id) => {
+    const owner = id.includes("/") ? id.slice(0, id.indexOf("/")).toLowerCase() : ""
+    return owner !== "" && (UPSTREAMS[owner] ?? owner) === upstream
+  })
+  // A window no account measured has no share: it is left out, never sent as 0% used.
+  return (Array.isArray(entry?.windows) ? entry.windows : []).filter((w) => Number.isFinite(w?.usedPercent)).map((w) => {
+    const label = typeof w.label === "string" && w.label ? w.label : String(w.id ?? "")
+    const span = SPANS[w.id]
+    // Other windows count only the models they are named after (Claude's "Fable", a Codex model's
+    // own "GPT-5.3-Codex-Spark · Weekly"). One that names none (Codex's code review, Claude's
+    // OAuth apps) is shown but set aside, so it never holds back the upstream's other models.
+    const named = label.split(" · ")[0].toLowerCase()
+    const models = span ? served : served.filter((id) => named && id.toLowerCase().includes(named))
+    return { name: `${upstream} · ${label}`, used: w.usedPercent, ...(span ? { span } : {}), ...(models.length ? { models } : { aside: true }) }
+  })
+}
+
 export async function ZgapPlugin(input, options = {}) {
   // The page is an extra and never decides whether ZGAP loads. Without this plugin loaded, magpie sends
   // ZGAP requests with no token: each is a 401, and magpie then shows the account as signed out.
@@ -283,6 +336,7 @@ export async function ZgapPlugin(input, options = {}) {
       rotating: true,
       methods: [{ type: "oauth", label: SIGN_IN_LABELS.en, labels: SIGN_IN_LABELS, authorize }],
       refresh,
+      usage,
       loader: async (getAuth) => ({ baseURL: BASE, fetch: (input, init) => send(getAuth, input, init) }),
     },
   }

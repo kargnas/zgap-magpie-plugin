@@ -236,6 +236,77 @@ test("reasoning effort levels in ZGAP's list reach magpie as variants, and a mod
   assert.deepEqual(Object.keys(rows["relay/junk"].variants), ["low"])
 })
 
+// The shape ZGAP's /v1/dashboard/remaining-usage answers (agp-proxy-stack remainingUsageView).
+const remaining = {
+  generatedAt: "2026-11-26T03:00:00Z",
+  providers: [
+    { provider: "claude", windows: [
+      { id: "five_hour", label: "Session", usedPercent: 18.2, recharges: [{ at: "2026-11-26T04:00:00Z", percent: 4 }] },
+      { id: "seven_day", label: "Weekly", usedPercent: null, recharges: [] },
+      { id: "seven_day_fable", label: "Fable", usedPercent: 95, recharges: [] },
+      { id: "seven_day_oauth_apps", label: "OAuth apps", usedPercent: 40, recharges: [] },
+    ] },
+    { provider: "codex", windows: [
+      { id: "weekly", label: "Weekly", usedPercent: 62, recharges: [] },
+      { id: "gpt-5-3-codex-spark-weekly", label: "GPT-5.3-Codex-Spark · Weekly", usedPercent: 100, recharges: [] },
+      { id: "code-review-weekly", label: "Code review · Weekly", usedPercent: 99, recharges: [] },
+    ] },
+    { provider: "kimi", windows: [{ id: "weekly", label: "Weekly", usedPercent: 7, recharges: [] }] },
+    { provider: "antigravity", windows: [{ id: "weekly", label: "Weekly", usedPercent: 50, recharges: [] }] },
+  ],
+}
+const zgapModels = Object.fromEntries(["anthropic/claude-fable-5-2", "anthropic/claude-sonnet-5-5", "openai/gpt-6.2-sol", "openai/gpt-5.3-codex-spark", "moonshot/kimi-k3", "laysoai/glm-5"].map((id) => [id, { id }]))
+
+test("usage reads ZGAP's remaining usage into windows that count only the models of their upstream", async () => {
+  const { auth } = await ZgapPlugin()
+  const calls = stub(() => json(200, remaining))
+  const read = await auth.usage(async () => ({ type: "oauth", access: "token" }), { id: "zgap", models: zgapModels }, {})
+  assert.equal(calls[0].url, "https://ai-proxy.zz.gg/v1/dashboard/remaining-usage")
+  assert.equal(calls[0].headers.get("authorization"), "Bearer token")
+  const claude = ["anthropic/claude-fable-5-2", "anthropic/claude-sonnet-5-5"]
+  assert.deepEqual(read, { windows: [
+    { name: "claude · Session", used: 18.2, span: 18000, models: claude },
+    // Weekly was measured on no account: left out, not 0% used.
+    { name: "claude · Fable", used: 95, models: ["anthropic/claude-fable-5-2"] },
+    { name: "claude · OAuth apps", used: 40, aside: true },
+    { name: "codex · Weekly", used: 62, span: 604800, models: ["openai/gpt-6.2-sol", "openai/gpt-5.3-codex-spark"] },
+    { name: "codex · GPT-5.3-Codex-Spark · Weekly", used: 100, models: ["openai/gpt-5.3-codex-spark"] },
+    { name: "codex · Code review · Weekly", used: 99, aside: true },
+    { name: "kimi · Weekly", used: 7, span: 604800, models: ["moonshot/kimi-k3"] },
+    // No listed model is served by it, so it holds back none of them.
+    { name: "antigravity · Weekly", used: 50, span: 604800, aside: true },
+  ] })
+  assert.ok(read.windows.every((w) => !("resetsAt" in w)), "ZGAP's recharges each bring back a part of a window, not a reset")
+
+  // Before the model list is read, nothing is scoped to all models.
+  const unlisted = await auth.usage(async () => ({ type: "oauth", access: "token" }), { id: "zgap", models: {} })
+  assert.ok(unlisted.windows.every((w) => w.aside && !("models" in w)))
+})
+
+test("a failed usage read is an error, never 0% used, and leaves the sign-in alone unless there is none", async () => {
+  const { auth } = await ZgapPlugin()
+  const signedIn = async () => ({ type: "oauth", access: "token" })
+  for (const [status, body, message] of [
+    [503, { error: "quota_unavailable" }, /remaining usage failed \(quota_unavailable\)/],
+    [403, { error: "not_registered" }, /not_registered/],
+    [401, { error: "invalid_token" }, /invalid_token/],
+    [502, "<html>", /HTTP 502/],
+    [200, { providers: "none" }, /not valid/],
+  ]) {
+    stub(() => (typeof body === "string" ? new Response(body, { status }) : json(status, body)))
+    // magpie marks the account for a new sign-in on an error saying "sign in again", or on signIn: "expired".
+    await assert.rejects(() => auth.usage(signedIn, { models: zgapModels }), (error) => message.test(error.message) && !/sign in again/i.test(error.message) && error.signIn === undefined)
+  }
+  const calls = stub(() => json(200, remaining))
+  await assert.rejects(() => auth.usage(async () => undefined, { models: zgapModels }), (error) => error.signIn === "expired")
+  assert.equal(calls.length, 0, "no request goes out without a token")
+
+  const stop = new AbortController()
+  stop.abort(new Error("magpie gave up"))
+  globalThis.fetch = async (_input, init) => init.signal.throwIfAborted()
+  await assert.rejects(() => auth.usage(signedIn, { models: zgapModels }, { signal: stop.signal }), /magpie gave up/)
+})
+
 // magpie keeps the plugin host it replaces (a Bun update, a plugin installed, updated or set) until
 // that host's replies end, so the new host loads ZGAP while the old one still holds the page's port.
 test("ZGAP loads while another host holds the page's port, and the page takes the port once it is free", { timeout: 10_000 }, async (t) => {
