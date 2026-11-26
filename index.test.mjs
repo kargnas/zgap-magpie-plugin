@@ -237,25 +237,28 @@ test("reasoning effort levels in ZGAP's list reach magpie as variants, and a mod
 })
 
 // The shape ZGAP's /v1/dashboard/remaining-usage answers (agp-proxy-stack remainingUsageView).
+const win = (id, label, usedPercent, durationSeconds, accountWide, recharges = []) => ({ id, label, usedPercent, durationSeconds, accountWide, recharges })
 const remaining = {
   generatedAt: "2026-11-26T03:00:00Z",
   providers: [
     { provider: "claude", windows: [
-      { id: "five_hour", label: "Session", usedPercent: 18.2, recharges: [{ at: "2026-11-26T04:00:00Z", percent: 4 }] },
-      { id: "seven_day", label: "Weekly", usedPercent: null, recharges: [] },
-      { id: "seven_day_fable", label: "Fable", usedPercent: 95, recharges: [] },
-      { id: "seven_day_oauth_apps", label: "OAuth apps", usedPercent: 40, recharges: [] },
+      win("five_hour", "Session", 18.2, 18000, true, [{ at: "2026-11-26T04:00:00Z", percent: 4 }]),
+      win("seven_day", "Weekly", null, 604800, true),
+      win("limit-fable", "Fable", 95, null, false),
+      win("seven_day_oauth_apps", "OAuth apps", 40, null, false),
     ] },
     { provider: "codex", windows: [
-      { id: "weekly", label: "Weekly", usedPercent: 62, recharges: [] },
-      { id: "gpt-5-3-codex-spark-weekly", label: "GPT-5.3-Codex-Spark · Weekly", usedPercent: 100, recharges: [] },
-      { id: "code-review-weekly", label: "Code review · Weekly", usedPercent: 99, recharges: [] },
+      win("weekly", "Weekly", 62, 604800, true),
+      win("gpt-5-3-codex-spark-weekly", "GPT-5.3-Codex-Spark · Weekly", 100, 604800, false),
+      win("code-review-weekly", "Code review · Weekly", 99, 604800, false),
     ] },
-    { provider: "kimi", windows: [{ id: "weekly", label: "Weekly", usedPercent: 7, recharges: [] }] },
-    { provider: "antigravity", windows: [{ id: "weekly", label: "Weekly", usedPercent: 50, recharges: [] }] },
+    // Kimi's short limit: ZGAP keeps Kimi's own words in its ID and names it by its length.
+    { provider: "kimi", windows: [win("300time-unit-minute", "5h", 12, 18000, true), win("weekly", "Weekly", 7, 604800, true)] },
+    { provider: "xai", windows: [win("credits", "Credits (Weekly)", 3, 604800, true), win("on-demand", "On-demand", 20, null, false)] },
+    { provider: "antigravity", windows: [win("gemini-3-pro-high", "Gemini 3 Pro · gemini-3-pro-high", 50, null, false)] },
   ],
 }
-const zgapModels = Object.fromEntries(["anthropic/claude-fable-5-2", "anthropic/claude-sonnet-5-5", "openai/gpt-6.2-sol", "openai/gpt-5.3-codex-spark", "moonshot/kimi-k3", "laysoai/glm-5"].map((id) => [id, { id }]))
+const zgapModels = Object.fromEntries(["anthropic/claude-fable-5-2", "anthropic/claude-sonnet-5-5", "openai/gpt-6.2-sol", "openai/gpt-5.3-codex-spark", "moonshot/kimi-k3", "x-ai/grok-5", "laysoai/glm-5"].map((id) => [id, { id }]))
 
 test("usage reads ZGAP's remaining usage into windows that count only the models of their upstream", async () => {
   const { auth } = await ZgapPlugin()
@@ -270,11 +273,15 @@ test("usage reads ZGAP's remaining usage into windows that count only the models
     { name: "claude · Fable", used: 95, models: ["anthropic/claude-fable-5-2"] },
     { name: "claude · OAuth apps", used: 40, aside: true },
     { name: "codex · Weekly", used: 62, span: 604800, models: ["openai/gpt-6.2-sol", "openai/gpt-5.3-codex-spark"] },
-    { name: "codex · GPT-5.3-Codex-Spark · Weekly", used: 100, models: ["openai/gpt-5.3-codex-spark"] },
-    { name: "codex · Code review · Weekly", used: 99, aside: true },
+    { name: "codex · GPT-5.3-Codex-Spark · Weekly", used: 100, span: 604800, models: ["openai/gpt-5.3-codex-spark"] },
+    { name: "codex · Code review · Weekly", used: 99, span: 604800, aside: true },
+    // Account-wide windows count every model of their upstream, whatever they are called.
+    { name: "kimi · 5h", used: 12, span: 18000, models: ["moonshot/kimi-k3"] },
     { name: "kimi · Weekly", used: 7, span: 604800, models: ["moonshot/kimi-k3"] },
+    { name: "xai · Credits (Weekly)", used: 3, span: 604800, models: ["x-ai/grok-5"] },
+    { name: "xai · On-demand", used: 20, aside: true },
     // No listed model is served by it, so it holds back none of them.
-    { name: "antigravity · Weekly", used: 50, span: 604800, aside: true },
+    { name: "antigravity · Gemini 3 Pro · gemini-3-pro-high", used: 50, aside: true },
   ] })
   assert.ok(read.windows.every((w) => !("resetsAt" in w)), "ZGAP's recharges each bring back a part of a window, not a reset")
 

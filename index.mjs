@@ -267,9 +267,6 @@ function variantsOf(efforts) {
 // Kimi models under. Any other owner is its own name (zai, or an OpenAI-compatible provider, which
 // has no quota window).
 const UPSTREAMS = { anthropic: "claude", openai: "codex", moonshot: "kimi", "x-ai": "xai" }
-// The windows ZGAP reports for an upstream's whole account, by ID, and how many seconds each runs.
-// magpie ranks a week ahead of the five hours in it and treats the five hours as a rate cap.
-const SPANS = { five_hour: 5 * 3600, session: 5 * 3600, seven_day: 7 * 86400, weekly: 7 * 86400 }
 // How long a good remaining-usage read stands. A running magpie (the app, `magpie serve`) reads every
 // account's usage each minute, and these means over ZGAP's accounts move slowly, so 3 minutes is
 // enough. Each magpie command starts its own plugin host, so a `magpie quota` run always reads afresh.
@@ -318,12 +315,16 @@ function windowsOf(entry, ids) {
   // A window no account measured has no share: it is left out, never sent as 0% used.
   return (Array.isArray(entry?.windows) ? entry.windows : []).filter((w) => Number.isFinite(w?.usedPercent)).map((w) => {
     const label = typeof w.label === "string" && w.label ? w.label : String(w.id ?? "")
-    const span = SPANS[w.id]
-    // Other windows count only the models they are named after (Claude's "Fable", a Codex model's
-    // own "GPT-5.3-Codex-Spark · Weekly"). One that names none (Codex's code review, Claude's
-    // OAuth apps) is shown but set aside, so it never holds back the upstream's other models.
+    // ZGAP says how long each window runs (null when it doesn't know). magpie ranks a week ahead of
+    // the five hours in it and treats the five hours as a rate cap.
+    const span = Number.isFinite(w.durationSeconds) && w.durationSeconds > 0 ? w.durationSeconds : 0
+    // A window ZGAP marks account-wide (Session, Weekly, Kimi's 5h, xAI's credits) counts every model
+    // of its upstream. Any other window counts only the models it is named after (Claude's "Fable", a
+    // Codex model's own "GPT-5.3-Codex-Spark · Weekly"). One that names none (Codex's code review,
+    // Claude's OAuth apps, xAI's on-demand cap) is shown but set aside, so it never holds back the
+    // upstream's other models.
     const named = label.split(" · ")[0].toLowerCase()
-    const models = span ? served : served.filter((id) => named && id.toLowerCase().includes(named))
+    const models = w.accountWide === true ? served : served.filter((id) => named && id.toLowerCase().includes(named))
     return { name: `${upstream} · ${label}`, used: w.usedPercent, ...(span ? { span } : {}), ...(models.length ? { models } : { aside: true }) }
   })
 }
