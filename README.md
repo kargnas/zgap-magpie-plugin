@@ -55,6 +55,14 @@ on the same computer, and signing in here again updates the same session.
   An agent on Claude's Messages API, such as Claude Code, can only ask for Fast, so Ultrafast runs as Fast there.
 - **Requests**: ZGAP serves every model on Chat Completions, Messages and Responses, so magpie relays each
   agent's request in the protocol the agent sent it in. The plugin adds the current access token.
+- **Quota**: `magpie quota`, magpie's usage views and Quota first routing read ZGAP's remaining usage, the same
+  gateway-wide figures **Live activity** shows: per upstream (Claude, Codex, Kimi and the rest), the mean share
+  used of each window over ZGAP's accounts. An upstream's 5-hour and weekly windows count only the models it
+  serves, and a window named after a model (Claude's Fable) counts only that model. Other windows are shown but
+  never hold back routing. ZGAP does not say when its pooled windows reset, so magpie takes each window to renew a
+  full span from now, and Quota first spends accounts that renew sooner first. A 5-hour window at 90% used, or any
+  window at 98%, still puts ZGAP behind the others. A window no ZGAP account measured is left out, and a failed read
+  shows as an error, never as 0% used.
 - **Tokens**: the access token lasts 24 hours. magpie renews it before it runs out with the refresh token,
   which ZGAP replaces on every renewal and keeps valid for 30 days.
 
