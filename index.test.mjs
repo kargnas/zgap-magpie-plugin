@@ -307,6 +307,32 @@ test("a failed usage read is an error, never 0% used, and leaves the sign-in alo
   await assert.rejects(() => auth.usage(signedIn, { models: zgapModels }, { signal: stop.signal }), /magpie gave up/)
 })
 
+test("a good usage read stands 3 minutes for its own sign-in only, and a failed one is tried again", async (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: 0 })
+  const { auth } = await ZgapPlugin()
+  const as = (access) => async () => ({ type: "oauth", access })
+  let status = 503
+  const calls = stub(() => (status === 200 ? json(200, remaining) : json(status, { error: "quota_unavailable" })))
+  await assert.rejects(() => auth.usage(as("a"), { models: zgapModels }), /quota_unavailable/)
+  status = 200
+  // A fresh good read says nothing of the sign-in, so magpie takes it as clean and clears an expired mark.
+  assert.equal((await auth.usage(as("a"), { models: zgapModels })).signIn, undefined)
+  assert.equal(calls.length, 2, "a failed read is not kept")
+
+  t.mock.timers.tick(3 * 60_000 - 1)
+  const kept = await auth.usage(as("a"), { models: {} })
+  assert.equal(calls.length, 2)
+  // A kept read leaves the sign-in as magpie has it: the token may have lapsed since it was read.
+  assert.equal(kept.signIn, "kept")
+  assert.ok(kept.windows.length && kept.windows.every((w) => w.aside), "a kept read counts the models listed now")
+  await auth.usage(as("b"), { models: zgapModels })
+  assert.equal(calls.length, 3, "another sign-in reads its own")
+
+  t.mock.timers.tick(1)
+  assert.equal((await auth.usage(as("a"), { models: zgapModels })).signIn, undefined)
+  assert.equal(calls.length, 4, "after 3 minutes ZGAP is read again")
+})
+
 // magpie keeps the plugin host it replaces (a Bun update, a plugin installed, updated or set) until
 // that host's replies end, so the new host loads ZGAP while the old one still holds the page's port.
 test("ZGAP loads while another host holds the page's port, and the page takes the port once it is free", { timeout: 10_000 }, async (t) => {
